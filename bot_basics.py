@@ -4,6 +4,7 @@ import time
 from slackclient import SlackClient
 from api_consumer import get_requests, get_by_user, NoRequests
 
+READ_WEBSOCKET_DELAY = 1
 BOT_NAME = 'alfbot'
 BOT_ID = os.environ.get('SLACK_BOT_ID')
 AT_BOT = "<@{}>".format(BOT_ID)
@@ -12,6 +13,34 @@ ASK = "anything for me?"
 HELP = "help"
 TEST = "test"
 slack_client = SlackClient(os.environ.get('SLACK_TOKEN'))
+
+DAYS = { 'monday' : 1, 
+        'tuesday' : 2, 
+        'wednesday' : 3, 
+        'thursday' : 4, 
+        'friday' : 5 }
+
+def get_by_day(command, channel, userorigin):
+    response = "Okay, what day are you looking for requests from?"
+    slack_client.api_call("chat.postMessage", channel=channel, text=response, as_user=True, mrkdown=True)
+    while True: 
+        command, channel, user = parse_slack_output(slack_client.rtm_read())
+        print(command, channel, user)
+        slack_client.api_call("chat.postMessage", channel=channel, text="Got it getting requests for {}".format(command), as_user=True, mrkdown=True)
+        if command and channel and user == userorigin:
+            if command.lower() in DAYS.keys():
+                response = get_requests(day=DAYS.get(command.lower()))
+                for message in response:
+                    msg = json.dumps([
+                        {
+                        "text": message,
+                        "color" : "#3AA3e3",
+                        "attachment_type" : "default",
+                        "mrkdwn_in" : ["text"],
+                        }])
+                    slack_client.api_call("chat.postMessage", channel=channel, text="Request", attachments = msg, as_user=True, mrkdown=True)
+                return "All done!"
+        time.sleep(READ_WEBSOCKET_DELAY)
 
 def get_sessions(command, channel):
         commands = command.split(' ')
@@ -59,7 +88,9 @@ def get_session_by_user(uid, channel):
 
 def handle_command(command, channel, user):
     response = "Sorry, I am a simple robot and can only show you requests. Try typing 'help' to get my valid commands!"
-    if command.startswith(SHOW):
+    if command == 'show by day':
+        response = get_by_day(command, channel, user)
+    elif command.startswith(SHOW):
         response = get_sessions(command, channel)
     elif command.startswith(HELP):
         response = """\
@@ -85,7 +116,6 @@ def parse_slack_output(slack_rtm_output):
 
 
 if __name__ == '__main__':
-    READ_WEBSOCKET_DELAY = 1
     if slack_client.rtm_connect():
         print("ALFBOT READY TO GO")
         api_call = slack_client.api_call("users.list")

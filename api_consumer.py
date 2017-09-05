@@ -4,12 +4,15 @@ import requests
 class NoRequests(Exception):
     pass
 
-PROTOCOL = "http"
-ROOT =  "localhost:8000"
+PROTOCOL = "https"
+ROOT =  "asiportal.cis.fiu.edu"
 AUTH_HEADS = {'Authorization' : 'Token {}'.format(os.environ.get('API_AUTH_TOKEN')) }
 
-def get_requests(get=0):
-    resp = requests.get("{}://{}/api/requests/?status=A".format(PROTOCOL, ROOT), headers=AUTH_HEADS)
+def get_requests(get=0, day=None):
+    if day is None:
+        resp = requests.get("{}://{}/api/requests/?status=A".format(PROTOCOL, ROOT), headers=AUTH_HEADS)
+    else:
+        resp = requests.get("{}://{}/api/requests/?status=A&&availability__day={}".format(PROTOCOL, ROOT, day), headers=AUTH_HEADS)
     if resp.status_code != 200:
         raise ApiError('GET /api/requests/?status=A {}'.format(resp.status_code))
     if get == 0:
